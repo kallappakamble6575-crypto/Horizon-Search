@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f5f7f8">
+    <meta name="description" content="Search results from Horizon Search.">
+    <title>Search results · Horizon Search</title>
+    <link rel="stylesheet" href="/styles.css">
+    <script type="module" src="/results.js"></script>
+  </head>
+  <body class="results-page">
+    <header class="results-header">
+      <a class="brand" href="/" aria-label="Horizon Search home">
+        <img class="brand-logo" src="/horizon-logo.svg" alt="Horizon Search">
+      </a>
+      <form id="results-search-form" class="search-form results-search-form">
+        <label class="sr-only" for="results-query">Search the web</label>
+        <svg class="search-icon" aria-hidden="true" viewBox="0 0 24 24" fill="none">
+          <circle cx="10.8" cy="10.8" r="6.8"></circle>
+          <path d="m16 16 4.5 4.5"></path>
+        </svg>
+        <input
+          id="results-query"
+          name="query"
+          type="search"
+          maxlength="400"
+          placeholder="What are you looking for?"
+          autocomplete="off"
+          spellcheck="false"
+          required
+        >
+        <button type="submit" class="search-button">
+          <span>Search</span>
+          <span aria-hidden="true">→</span>
+        </button>
+      </form>
+      <span class="provider-badge"><span class="provider-dot"></span> Brave-powered</span>
+    </header>
+
+    <nav class="result-tabs" aria-label="Search categories">
+      <a href="#" data-type="all">All</a>
+      <a href="#" data-type="images">Images</a>
+      <a href="#" data-type="videos">Videos</a>
+      <a href="#" data-type="maps">Maps</a>
+      <a href="#" data-type="shopping">Shopping</a>
+      <a href="#" data-type="news">News</a>
+    </nav>
+
+    <main class="results-main">
+      <p class="result-disclosure">
+        Search terms are sent to Brave when you choose a Brave category. Maps
+        and Shopping open Google only when you follow their link.
+      </p>
+      <section class="results-section results-content" aria-label="Search results">
+        <p id="status" class="status" role="status" aria-live="polite">
+          Preparing results…
+        </p>
+        <ol id="results" class="results" aria-label="Search results"></ol>
+        <nav id="pagination" class="pagination" aria-label="Search result pages" hidden></nav>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-links">
+        <a class="footer-terms" href="/terms">Terms &amp; Conditions</a>
+        <a class="footer-terms" href="/privacy">Privacy Notice</a>
+      </div>
+      <div class="footer-credit">
+        <span>Results provided by Brave Search</span>
+        <span>Created by Teja Thuppeda</span>
+      </div>
+    </footer>
+  </body>
+</html>
