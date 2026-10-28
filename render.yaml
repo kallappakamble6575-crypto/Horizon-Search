@@ -2,6 +2,7 @@ services:
   - type: web
     name: horizon-search
     runtime: node
+    plan: free
     buildCommand: npm install
     startCommand: npm start
     healthCheckPath: /healthz
