@@ -5,7 +5,7 @@ independently index the web.
 
 ## Run locally
 
-- Install Node.js 22.9 or newer.
+- Install Node.js 22.9 through 24.x.
 - Run `npm start` in this folder.
 - Open <http://localhost:3000>.
 
@@ -32,17 +32,42 @@ confirmation and legal review before public launch.
 
 ## Security boundary
 
-The local server binds to `127.0.0.1` and accepts search requests only with
-JSON content, a matching same-origin `Origin`, and no cross-site Fetch Metadata
-signal. If a trusted reverse proxy serves the app at another origin, set
-`HORIZON_ALLOWED_ORIGIN` to that exact origin. Keep the Node server bound to
-loopback behind that proxy.
+The local server binds to `127.0.0.1` by default and accepts search requests
+only with JSON content, a matching same-origin `Origin`, and no cross-site
+Fetch Metadata signal. An explicitly configured `HORIZON_ALLOWED_ORIGIN`
+supports a trusted reverse proxy.
 
-These checks mitigate browser-based cross-site request forgery; they are not
-user authentication. Do not expose this anonymous, billable search endpoint
-publicly without deployment-level authentication or abuse controls, global
-quotas, and provider budget alerts. The in-memory per-client rate limit is not
-a substitute for those controls.
+The Render Blueprint (`render.yaml`) binds to `0.0.0.0` and requires
+application-wide HTTP Basic authentication before serving pages or search
+requests. Set the username, password, and Brave key as secret environment
+variables in Render; never commit their values. Render terminates HTTPS for
+the public service. The health check at `/healthz` intentionally does not
+require credentials.
+
+The Render deployment is intended for private, owner-only use. Basic Auth and
+same-origin checks are not a public user-account system or a substitute for
+global quotas and provider budget controls. Do not change the service to
+public use without first choosing suitable authentication and abuse controls.
+For Render's default URL, the server verifies HTTPS and that the request Origin
+matches its host. Set `HORIZON_ALLOWED_ORIGIN` only when a custom domain or
+trusted proxy requires an explicit origin.
+
+## Deploy to Render
+
+1. In Render, choose **New → Blueprint** and connect this repository's `main`
+   branch. Render reads `render.yaml` and creates the protected web service.
+2. Set the prompted `HORIZON_BASIC_AUTH_USER`, `HORIZON_BASIC_AUTH_PASSWORD`,
+   and `BRAVE_SEARCH_API_KEY` values in Render. Use a unique, strong password;
+   do not reuse the Brave API key as the site password.
+3. Deploy, then open the assigned `https://…onrender.com` URL. The browser
+   will ask for the Basic Auth username and password before showing the app.
+4. If using a custom domain or trusted proxy, set `HORIZON_ALLOWED_ORIGIN` to
+   that exact HTTPS origin (without a trailing slash).
+
+The app must not be used for searches until both Basic Auth credentials and
+the Brave key are set in Render. The server fails to start if required auth
+configuration is incomplete, and search requests fail closed on a mismatched
+origin.
 
 ## Checks
 

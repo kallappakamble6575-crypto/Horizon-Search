@@ -1,11 +1,14 @@
 import assert from "node:assert/strict";
+import { request as httpRequest } from "node:http";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { createServer } from "../src/server.mjs";
 
 test("keeps the example credential blank", async () => {
   const example = await readFile(new URL("../.env.example", import.meta.url), "utf8");
-  assert.equal(example.trim(), "BRAVE_SEARCH_API_KEY=");
+  assert.match(example, /^BRAVE_SEARCH_API_KEY=\r?$/m);
+  assert.match(example, /^HORIZON_BASIC_AUTH_USER=\r?$/m);
+  assert.match(example, /^HORIZON_BASIC_AUTH_PASSWORD=\r?$/m);
 });
 
 async function withServer(options, run) {
@@ -21,13 +24,83 @@ async function withServer(options, run) {
   }
 }
 
-function searchHeaders(origin) {
+function searchHeaders(origin, authorization) {
   return {
     "Content-Type": "application/json",
     Origin: origin,
     "Sec-Fetch-Site": "same-origin",
+    ...(authorization ? { Authorization: authorization } : {}),
   };
 }
+
+function sendRawRequest(url, { headers, body }) {
+  return new Promise((resolve, reject) => {
+    const request = httpRequest(url, { method: "POST", headers }, (response) => {
+      response.resume();
+      response.on("end", () => resolve(response.statusCode));
+    });
+    request.on("error", reject);
+    request.end(body);
+  });
+}
+
+test("requires valid credentials for the private deployment", async () => {
+  let providerCalls = 0;
+  await withServer({
+    apiKey: "test-token",
+    requireAuth: true,
+    authUser: "owner",
+    authPassword: "test-password",
+    fetchImpl: async () => {
+      providerCalls += 1;
+      return Response.json({ web: { results: [] } });
+    },
+  }, async (origin) => {
+    for (const path of ["/", "/results", "/terms", "/privacy"]) {
+      const response = await fetch(`${origin}${path}`);
+      assert.equal(response.status, 401);
+      assert.match(response.headers.get("www-authenticate"), /^Basic realm=/);
+    }
+
+    const unauthorizedSearch = await fetch(`${origin}/api/search`, {
+      method: "POST",
+      headers: searchHeaders(origin),
+      body: JSON.stringify({ query: "private query" }),
+    });
+    assert.equal(unauthorizedSearch.status, 401);
+    assert.equal(providerCalls, 0);
+
+    const health = await fetch(`${origin}/healthz`);
+    assert.equal(health.status, 200);
+    assert.equal(await health.text(), "ok");
+
+    const authorization = `Basic ${Buffer.from("owner:test-password").toString("base64")}`;
+    const home = await fetch(origin, { headers: { Authorization: authorization } });
+    assert.equal(home.status, 200);
+    const search = await fetch(`${origin}/api/search`, {
+      method: "POST",
+      headers: searchHeaders(origin, authorization),
+      body: JSON.stringify({ query: "private query" }),
+    });
+    assert.equal(search.status, 200);
+    assert.equal(providerCalls, 1);
+  });
+});
+
+test("fails closed when required authentication credentials are incomplete", () => {
+  assert.throws(
+    () => createServer({ requireAuth: true }),
+    /credentials are not configured/,
+  );
+  assert.throws(
+    () => createServer({ authUser: "owner", authPassword: "" }),
+    /must both be set/,
+  );
+  assert.throws(
+    () => createServer({ authUser: "owner:name", authPassword: "test-password" }),
+    /must not contain a colon/,
+  );
+});
 
 test("serves the search page without making provider requests", async () => {
   let providerCalls = 0;
@@ -321,11 +394,11 @@ test("rejects cross-origin, originless, and non-JSON search requests", async () 
   });
 });
 
-test("allows an explicitly configured reverse-proxy origin", async () => {
+test("allows an explicitly configured Render origin", async () => {
   let providerCalls = 0;
   await withServer({
     apiKey: "test-token",
-    allowedOrigin: "https://search.example",
+    allowedOrigin: "https://horizon-search.onrender.com",
     fetchImpl: async () => {
       providerCalls += 1;
       return Response.json({ web: { results: [] } });
@@ -335,12 +408,58 @@ test("allows an explicitly configured reverse-proxy origin", async () => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Origin: "https://search.example",
+        Origin: "https://horizon-search.onrender.com",
         "Sec-Fetch-Site": "same-origin",
       },
       body: JSON.stringify({ query: "test" }),
     });
     assert.equal(response.status, 200);
+    assert.equal(providerCalls, 1);
+  });
+});
+
+test("rejects HTTPS search requests with a host that does not match the server", async () => {
+  let providerCalls = 0;
+  await withServer({
+    apiKey: "test-token",
+    fetchImpl: async () => {
+      providerCalls += 1;
+      return Response.json({ web: { results: [] } });
+    },
+  }, async (origin) => {
+    const response = await fetch(`${origin}/api/search`, {
+      method: "POST",
+      headers: {
+        ...searchHeaders("https://horizon-search.onrender.com"),
+      },
+      body: JSON.stringify({ query: "test" }),
+    });
+    assert.equal(response.status, 403);
+    assert.equal(providerCalls, 0);
+  });
+});
+
+test("accepts HTTPS same-origin search requests for the Render service host", async () => {
+  let providerCalls = 0;
+  await withServer({
+    apiKey: "test-token",
+    fetchImpl: async () => {
+      providerCalls += 1;
+      return Response.json({ web: { results: [] } });
+    },
+  }, async (origin) => {
+    const body = JSON.stringify({ query: "test" });
+    const status = await sendRawRequest(`${origin}/api/search`, {
+      headers: {
+        Host: "horizon-search.onrender.com",
+        Origin: "https://horizon-search.onrender.com",
+        "Sec-Fetch-Site": "same-origin",
+        "Content-Type": "application/json",
+        "Content-Length": Buffer.byteLength(body),
+      },
+      body,
+    });
+    assert.equal(status, 200);
     assert.equal(providerCalls, 1);
   });
 });

@@ -1,5 +1,6 @@
 import { createServer as createHttpServer } from "node:http";
 import { readFile } from "node:fs/promises";
+import { timingSafeEqual } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import {
   MAX_IMAGE_PAGES,
@@ -36,6 +37,45 @@ function send(response, status, contentType, body) {
 
 function sendJson(response, status, body) {
   send(response, status, "application/json; charset=utf-8", JSON.stringify(body));
+}
+
+function parseBoolean(value, name) {
+  if (value === undefined || value === "") return false;
+  if (value === "true") return true;
+  if (value === "false") return false;
+  throw new Error(`${name} must be "true" or "false".`);
+}
+
+function credentialsMatch(request, username, password) {
+  const authorization = request.headers.authorization;
+  const match = typeof authorization === "string" &&
+    authorization.length <= 1024 &&
+    /^Basic ([A-Za-z0-9+/]+={0,2})$/i.exec(authorization);
+  if (!match) return false;
+
+  const encodedCredentials = match[1];
+  const credentials = Buffer.from(encodedCredentials, "base64").toString("utf8");
+  if (Buffer.from(credentials, "utf8").toString("base64") !== encodedCredentials) {
+    return false;
+  }
+  const separator = credentials.indexOf(":");
+  if (separator < 0) return false;
+
+  const suppliedUsername = Buffer.from(credentials.slice(0, separator), "utf8");
+  const suppliedPassword = Buffer.from(credentials.slice(separator + 1), "utf8");
+  const expectedUsername = Buffer.from(username, "utf8");
+  const expectedPassword = Buffer.from(password, "utf8");
+  return suppliedUsername.length === expectedUsername.length &&
+    suppliedPassword.length === expectedPassword.length &&
+    timingSafeEqual(suppliedUsername, expectedUsername) &&
+    timingSafeEqual(suppliedPassword, expectedPassword);
+}
+
+function requireAuthentication(request, response, username, password) {
+  if (credentialsMatch(request, username, password)) return true;
+  response.setHeader("WWW-Authenticate", 'Basic realm="Horizon Search", charset="UTF-8"');
+  sendJson(response, 401, { error: "Authentication required." });
+  return false;
 }
 
 async function readRequestBody(request) {
@@ -96,9 +136,10 @@ function validateSearchRequest(request, allowedOrigin) {
     throw new HttpError("Search requests must come from this site.", 403);
   }
   if (
-    !LOOPBACK_HOSTS.has(hostUrl.hostname) ||
     originUrl.host !== hostUrl.host ||
-    originUrl.protocol !== "http:"
+    (LOOPBACK_HOSTS.has(hostUrl.hostname)
+      ? originUrl.protocol !== "http:"
+      : originUrl.protocol !== "https:")
   ) {
     throw new HttpError("Search requests must come from this site.", 403);
   }
@@ -164,16 +205,39 @@ async function serveStatic(pathname, response) {
 export function createServer({
   apiKey = process.env.BRAVE_SEARCH_API_KEY,
   allowedOrigin: configuredOrigin = process.env.HORIZON_ALLOWED_ORIGIN,
+  requireAuth = parseBoolean(process.env.HORIZON_REQUIRE_AUTH, "HORIZON_REQUIRE_AUTH"),
+  authUser = process.env.HORIZON_BASIC_AUTH_USER,
+  authPassword = process.env.HORIZON_BASIC_AUTH_PASSWORD,
   fetchImpl = fetch,
   now = Date.now,
   rateLimit = 20,
 } = {}) {
   const allowedOrigin = normalizeAllowedOrigin(configuredOrigin);
+  const authEnabled = Boolean(authUser || authPassword);
+  if (authEnabled && (!authUser || !authPassword)) {
+    throw new Error("HORIZON_BASIC_AUTH_USER and HORIZON_BASIC_AUTH_PASSWORD must both be set.");
+  }
+  if (requireAuth && !authEnabled) {
+    throw new Error("Basic authentication is required but its credentials are not configured.");
+  }
+  if (authUser?.includes(":")) {
+    throw new Error("HORIZON_BASIC_AUTH_USER must not contain a colon.");
+  }
   const allowSearch = makeRateLimiter(rateLimit, now);
 
   return createHttpServer(async (request, response) => {
     try {
       const url = new URL(request.url, "http://localhost");
+      if (request.method === "GET" && url.pathname === "/healthz") {
+        send(response, 200, "text/plain; charset=utf-8", "ok");
+        return;
+      }
+      if (
+        authEnabled &&
+        !requireAuthentication(request, response, authUser, authPassword)
+      ) {
+        return;
+      }
       if (request.method === "GET" && await serveStatic(url.pathname, response)) {
         return;
       }
@@ -233,7 +297,12 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   const server = createServer();
   server.requestTimeout = 10_000;
   server.headersTimeout = 10_000;
-  server.listen(3000, "127.0.0.1", () => {
-    process.stdout.write("Horizon Search is running at http://localhost:3000\n");
+  const host = process.env.HORIZON_HOST || "127.0.0.1";
+  const port = Number(process.env.PORT ?? 3000);
+  if (!Number.isInteger(port) || port < 1 || port > 65_535) {
+    throw new Error("PORT must be an integer between 1 and 65535.");
+  }
+  server.listen(port, host, () => {
+    process.stdout.write(`Horizon Search is listening on ${host}:${port}\n`);
   });
 }

@@ -1,7 +1,7 @@
 # Horizon Search — Project status
 
 **Last updated:** 2026-10-28  
-**Current phase:** Search vertical slice running locally
+**Current phase:** Search vertical slice running locally; Render configuration prepared
 
 ## Done
 
@@ -63,23 +63,31 @@
   and launch-specific legal requirements remain unconfirmed; qualified legal
   review is still needed before public launch.
 - All 23 automated tests pass after adding and routing both legal pages.
+- Added Render Blueprint configuration, Node version pin/range, `PORT`-aware
+  binding, and a health-check endpoint.
+- Added application-wide Basic Auth for the Render deployment. The Blueprint
+  requires credentials and the server fails closed if they are missing;
+  local development remains unauthenticated by default.
+- Added automated checks for protected routes, valid/invalid authentication,
+  Render-host same-origin requests, and the unauthenticated health check.
+- All 27 automated tests pass after the Render deployment changes.
+- Render deployment is configured but has not been created or deployed. The
+  owner must connect the GitHub repo to Render and enter the Brave key and
+  unique Basic Auth credentials in Render's environment settings.
 
 ## Waiting on the project owner
 
-- Before any public deployment, add deployment-level authentication or abuse
-  controls, shared/global quotas, and provider budget alerts. The local
-  per-client limit is in-memory and is not public-service protection.
-- Treat the search API as publicly abusable if a reverse proxy exposes it:
-  Origin checks stop browser CSRF, not direct HTTP clients that can forge an
-  Origin header.
-- If a trusted reverse proxy is used, configure `HORIZON_ALLOWED_ORIGIN` to the
-  exact public origin and keep the app server bound to loopback.
-- Confirm Brave plan limits and budget.
+- Connect the GitHub repository to Render and enter a unique Basic Auth
+  username/password and the Brave API key as Render environment secrets.
+- Confirm Brave plan limits and budget before using live search.
+- The current deployment is intentionally private. A public launch needs a
+  separate authentication and abuse-control design, including global quotas
+  and provider budget alerts.
 
 ## Next
 
-1. Make a user-submitted search to confirm live provider access.
-2. Confirm Brave plan limits and budget.
+1. Deploy the Render Blueprint and verify its health check.
+2. Confirm Brave plan limits and budget, then make an owner-submitted live search.
 3. Continue with result UX, filters, and accessibility checks.
 
 This status file is the project progress log and will be updated as work
