@@ -3,6 +3,25 @@
 A focused search interface backed by Brave Search. Horizon does not crawl or
 independently index the web.
 
+## Use Horizon Search
+
+The hosted search engine is available at
+[https://horizon-search-h0r3.onrender.com](https://horizon-search-h0r3.onrender.com).
+It is a private service: enter the Basic Auth username and password configured
+for the Render service when prompted. Do not share those credentials.
+
+The Render Free service may spin down after inactivity, so its first request
+after a quiet period can take about a minute while it starts.
+
+For browsers that support custom search URLs, use this template:
+
+```text
+https://horizon-search-h0r3.onrender.com/results?q=%s&type=all
+```
+
+The browser must support the site's Basic Auth prompt for address-bar searches
+to work smoothly.
+
 ## Run locally
 
 - Install Node.js 22.9 through 24.x.
@@ -52,22 +71,17 @@ For Render's default URL, the server verifies HTTPS and that the request Origin
 matches its host. Set `HORIZON_ALLOWED_ORIGIN` only when a custom domain or
 trusted proxy requires an explicit origin.
 
-## Deploy to Render
+## Render configuration
 
-1. In Render, choose **New → Blueprint** and connect this repository's `main`
-   branch. Render reads `render.yaml` and creates the protected web service.
-2. Set the prompted `HORIZON_BASIC_AUTH_USER`, `HORIZON_BASIC_AUTH_PASSWORD`,
-   and `BRAVE_SEARCH_API_KEY` values in Render. Use a unique, strong password;
-   do not reuse the Brave API key as the site password.
-3. Deploy, then open the assigned `https://…onrender.com` URL. The browser
-   will ask for the Basic Auth username and password before showing the app.
-4. If using a custom domain or trusted proxy, set `HORIZON_ALLOWED_ORIGIN` to
-   that exact HTTPS origin (without a trailing slash).
+The service is managed by the [Render Blueprint](./render.yaml) and deploys
+from the `main` branch. Render holds `HORIZON_BASIC_AUTH_USER`,
+`HORIZON_BASIC_AUTH_PASSWORD`, and `BRAVE_SEARCH_API_KEY` as environment
+secrets; never commit their values. Use a unique, strong Basic Auth password,
+not the Brave API key.
 
-The app must not be used for searches until both Basic Auth credentials and
-the Brave key are set in Render. The server fails to start if required auth
-configuration is incomplete, and search requests fail closed on a mismatched
-origin.
+The deployment binds to Render's `PORT`, requires Basic Auth, and exposes
+`/healthz` for the platform health check. If using a custom domain or trusted
+proxy, configure `HORIZON_ALLOWED_ORIGIN` to that exact HTTPS origin.
 
 ## Checks
 
