@@ -1,7 +1,7 @@
 # Horizon Search — Project status
 
-**Last updated:** 2026-10-28  
-**Current phase:** Search vertical slice running locally; Render configuration prepared
+**Last updated:** 2026-10-29
+**Current phase:** Published on Render as a private, Basic Auth-protected service
 
 ## Done
 
@@ -71,24 +71,30 @@
 - Added automated checks for protected routes, valid/invalid authentication,
   Render-host same-origin requests, and the unauthenticated health check.
 - All 27 automated tests pass after the Render deployment changes.
-- Render deployment is configured but has not been created or deployed. The
-  owner must connect the GitHub repo to Render and enter the Brave key and
-  unique Basic Auth credentials in Render's environment settings.
+- Published the Render service at
+  `https://horizon-search-h0r3.onrender.com/`; an unauthenticated request
+  returned HTTP 401, consistent with the configured Basic Auth protection.
+- Updated the GitHub README with the published URL, private-access note,
+  Free-plan wake-up behavior, and custom browser search URL template.
 
 ## Waiting on the project owner
 
-- Connect the GitHub repository to Render and enter a unique Basic Auth
-  username/password and the Brave API key as Render environment secrets.
-- Confirm Brave plan limits and budget before using live search.
-- The current deployment is intentionally private. A public launch needs a
-  separate authentication and abuse-control design, including global quotas
-  and provider budget alerts.
+- Sign in to the hosted service and confirm that authenticated searches work;
+  this requires a live Brave API request and uses the configured Brave quota.
+- Confirm Brave plan limits and spending/budget alerts.
+- Review the Terms & Conditions and Privacy Notice with qualified counsel.
+  Confirm Render's and Brave's applicable data-handling and retention details.
+- The hosted service is intentionally private. Before making it public, choose
+  an appropriate authentication model and add deployment-wide abuse controls,
+  global quotas, and provider budget alerts.
 
 ## Next
 
-1. Deploy the Render Blueprint and verify its health check.
-2. Confirm Brave plan limits and budget, then make an owner-submitted live search.
-3. Continue with result UX, filters, and accessibility checks.
+1. Verify the hosted search flow using the Render Basic Auth credentials.
+2. Confirm Brave plan limits and budget, and review the legal pages before
+   promoting the service beyond private owner use.
+3. If desired, configure Horizon as a browser search provider where supported;
+   verify Basic Auth works with that browser's address-bar search flow.
 
 This status file is the project progress log and will be updated as work
 continues.
